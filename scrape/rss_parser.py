@@ -1,6 +1,6 @@
 import json
 from typing import List
-from models.model import Headline, create_unique_id
+from models.headline import Headline, create_unique_id
 
 import feedparser
 
