@@ -1,0 +1,31 @@
+name: Run application nu_nl_scraper
+on:
+  push:
+  schedule:
+    - cron: "05 7 * * *" # every day at 9:05 am
+
+jobs:
+  run:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.9]
+        os: [ubuntu-18.04]
+    runs-on: ${{ matrix.os }}
+    if: ${{ github.event_name == 'schedule' || github.ref == 'refs/heads/master'}}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -r requirements.txt
+      - name: run main.py
+        run: |
+          python main.py
+        env:
+          SECRET_ENV: ${{ secrets.SECRET_ENV }} # replace me
+      - uses: lassebenni/publish-to-github-action@master
+        if: ${{ github.event_name == 'schedule' || github.ref == 'refs/heads/master' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
