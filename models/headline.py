@@ -1,22 +1,27 @@
-from dataclasses import dataclass, asdict
+from pydantic import BaseModel, Extra, validator
 from datetime import datetime
 import hashlib
-from typing import List
+from typing import Optional
 
 
-@dataclass
-class Headline:
+class Headline(BaseModel, extra=Extra.allow):
     title: str
     summary: str
-    url: str
+    link: Optional[str] = ""
+    url: str = ""
     datetime: str = datetime.now().isoformat()
     id: str = ""
 
-    def __post_init__(self):
-        self.id = create_unique_id(self.title)
+    @validator("url", pre=True)
+    def set_url(cls, v, values):
+        if v:
+            return v
+        else:
+            return values["link"]
 
-    def as_dict(self):
-        return asdict(self)
+    @validator("id", pre=True)
+    def set_id(cls, v, values):
+        return create_unique_id(values["title"])
 
 
 def create_unique_id(title: str):
