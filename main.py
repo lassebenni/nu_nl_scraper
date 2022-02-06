@@ -1,21 +1,14 @@
-from scrape.rss_parser import (
-    parse_headlines,
-    read_previous_headlines,
-    store_headlines,
-    drop_duplicates,
-)
+from scrape.rss_parser import parse_headlines
+from scrape.scraper import scrape_headlines
+from models.headline import store_headlines
 
 PATH = "output/results.json"
 
 
 def main():
-    headlines = parse_headlines()
-
-    prev_headlines = read_previous_headlines(PATH)
-
-    headlines = drop_duplicates(headlines + prev_headlines)
-
-    store_headlines(PATH, headlines)
+    # headlines = parse_headlines(PATH)
+    headlines = scrape_headlines(PATH)
+    store_headlines(headlines)
 
 
 if __name__ == "__main__":
