@@ -2,7 +2,7 @@ name: Run application nu_nl_scraper
 on:
   push:
   schedule:
-    - cron: "05 7 * * *" # every day at 9:05 am
+    - cron: "05 7 * * *" # every day at 7:05 am
 
 jobs:
   run:
@@ -28,9 +28,3 @@ jobs:
         if: ${{ github.event_name == 'schedule' || github.ref == 'refs/heads/master' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: headlines
-          path: output/results.json
-          retention-days: 1
