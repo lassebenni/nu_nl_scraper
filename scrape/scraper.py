@@ -1,6 +1,6 @@
 import logging
 from typing import List
-from models.headline import Headline
+from models.headline import Headline, store_headlines
 from bs4 import BeautifulSoup as bs
 import requests
 
@@ -25,6 +25,8 @@ def scrape_headlines() -> List[Headline]:
         logger.error("No headlines found.")
         return []
 
+    ranking = 1  # "most read" ranking for each article
+
     for list_element in headline_list_elements:
         article_elements = list_element.find_all("a", class_="list__link")
 
@@ -33,8 +35,12 @@ def scrape_headlines() -> List[Headline]:
             url = article_element["href"]
 
             headline = Headline(
-                title=title.strip(), summary="", url=f"https://www.nu.nl{url}"
+                title=title.strip(),
+                summary="",
+                url=f"https://www.nu.nl{url}",
+                rank=ranking,
             )
+            ranking += 1
             headlines.append(headline)
 
     return headlines

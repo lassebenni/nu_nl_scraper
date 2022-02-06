@@ -7,11 +7,12 @@ from typing import Dict, List, Optional
 
 class Headline(BaseModel, extra=Extra.allow):
     title: str
-    summary: str
-    link: Optional[str] = ""
-    url: str = ""
+    url: str
+    summary: Optional[str] = None
+    link: Optional[str] = None
+    rank: Optional[int] = None
     datetime: str = datetime.now().isoformat()
-    id: str = ""
+    id: Optional[str] = None
 
     @validator("url", pre=True)
     def set_url(cls, v, values):
