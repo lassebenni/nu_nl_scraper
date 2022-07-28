@@ -1,4 +1,3 @@
-from scrape.rss_parser import parse_headlines
 from scrape.scraper import scrape_headlines
 from models.headline import store_headlines
 
