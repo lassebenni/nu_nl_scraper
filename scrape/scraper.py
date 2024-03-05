@@ -36,7 +36,7 @@ def scrape_headlines() -> List[Headline]:
         headline = Headline(
             title=title.strip(),
             summary="",
-            url=f"https://www.nu.nl{url}",
+            url=url,
             rank=ranking,
         )
         ranking += 1
