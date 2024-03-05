@@ -1,5 +1,6 @@
 name: Run application nu_nl_scraper
 on:
+  workflow_dispatch:
   push:
   schedule:
     - cron: "05 7 * * *" # every day at 7:05 am
