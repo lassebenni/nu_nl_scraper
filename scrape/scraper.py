@@ -10,7 +10,7 @@ URL = "https://www.nu.nl/meest-gelezen"
 
 
 def scrape_headlines() -> List[Headline]:
-    headlines: List[Headline] = []
+    res: List[Headline] = []
 
     feed = requests.get(URL)
 
@@ -19,28 +19,27 @@ def scrape_headlines() -> List[Headline]:
         return []
 
     soup = bs(feed.text)
-    headline_list_elements = soup.find_all("ul", class_="list list--datetime")
+    # headlines = soup.find_all("ul", class_="list list--datetime")
 
-    if not headline_list_elements:
+    nu_headlines = soup.select("ul.contentlist > li > a")
+
+    if not nu_headlines:
         logger.error("No headlines found.")
         return []
 
     ranking = 1  # "most read" ranking for each article
 
-    for list_element in headline_list_elements:
-        article_elements = list_element.find_all("a", class_="list__link")
+    for headline in nu_headlines:
+        title = headline.find("span").text
+        url = headline["href"]
 
-        for article_element in article_elements:
-            title = article_element.find("span").text
-            url = article_element["href"]
+        headline = Headline(
+            title=title.strip(),
+            summary="",
+            url=f"https://www.nu.nl{url}",
+            rank=ranking,
+        )
+        ranking += 1
+        res.append(headline)
 
-            headline = Headline(
-                title=title.strip(),
-                summary="",
-                url=f"https://www.nu.nl{url}",
-                rank=ranking,
-            )
-            ranking += 1
-            headlines.append(headline)
-
-    return headlines
+    return res
