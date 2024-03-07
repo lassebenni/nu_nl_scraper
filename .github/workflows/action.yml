@@ -26,7 +26,7 @@ jobs:
         env:
           SECRET_ENV: ${{ secrets.SECRET_ENV }} # replace me
       - name: Fetch rank 1 article
-        run: jq '.[] | select(.rank == 1)' output/results.json > output/rank1.json
+        run: jq '[.[] | select(.rank == 1)]' output/results.json > output/rank1.json
       - uses: lassebenni/publish-to-github-action@master
         if: ${{ github.event_name == 'schedule' || github.ref == 'refs/heads/master' }}
         env:
