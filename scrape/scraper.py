@@ -1,61 +1,356 @@
 import logging
-from typing import List
-from models.headline import Headline, store_headlines
+import time
+import json
+import os
+from typing import List, Optional, Dict, Any
 from bs4 import BeautifulSoup as bs
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from models.headline import Headline
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
+# Configuration
 URL = "https://www.nu.nl/meest-gelezen"
+DEBUG_DIR = "debug"
+# os.makedirs(DEBUG_DIR, exist_ok=True)  # Removed top-level directory creation
 
-payload = {}
-headers = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-    "Cookie": "consentUUID=16ec7356-f2e4-4efd-b2ad-1e3ff7271848_27; CookieConsent=CP3ptYAP3ptYAAGABCENAeEoAPLAAAAAABpYIzNBxDIUBQFCMXJ6SJswWIQX5kAAIgAQAAYBAyABhBoAIAQCkEESFATAAAACAAAAIAIAIABAGAAAAAAQQAABAAGASAAAgAIIICAAgAIBQAAIAAAAAAAAAAAAgAAAAAAAkAAAAAIgWEgAFAAAAAAAIAgAAAABAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAUEgMgALAAqAB4AEAAMgAaABEACYAE8AMwAbwA_ACEgEQARIAwABlQDuAO8AfoBIgCUgI9AXmAyQBk4DPggAIAjgBOw0AEBnwiACAz4dAfAAWABUAEAAMgAaABEACYAE8AMQAZgA3gB-gEQARIAwABlADRgHcAd4A_QCLAEiAJSAc4A6gCLwEegJkAXmAyQBk4DLAGfDgBAA6ACEAERAI4ATsBMQDBAGTEoBwACwAiABMADFAIgAiQBgADvAOoAi8BHoC8wGSAMnAZ8SACADuAI4AmIBlhSA4AAsACoAIAAZAA0ACIAEwAJ4AYgAzAB-gEQARIAwABlADRAHeAP0AiwBIgCUgHUAReAj0BeYDJAGTgMsAZ8UADAAKAHcAXUBMQDBAGTAAAA.YAAAAAAAAAAA; euconsent-v2=CPz10AAPz10AAAGABBENATEgAAAAAAAAACiQAAAAAAAA.YAAAAAAAAAAA; authUt=1; consentDate=2023-10-18T16:06:57.433Z; temptation-id=ts-d0eaeb7b-0515-4fb5-93e5-10eeaeb687a2; last_visit_timestamp=1710791636; _sp_su=false; __sectionViewCount-buitenland=26; authId=39aed31d-b386-42f5-b58c-06bf63ff61f8; __sectionViewCount-binnenland=9; __sectionViewCount-misdaad=1; __sectionViewCount-tech=2; __sectionViewCount-weerbericht=1; __sectionViewCount-verkiezingen-vs=1; __sectionViewCount-economie=1; __sectionViewCount-achterklap=2; __sectionViewCount-uitleg-over-het-coronavirus=1; __sectionViewCount-voetbal=1; gig_canary=false; gig_canary_ver=12940-3-27471510; s_id=d54964d2-0a8c-4abd-91f1-ced9b7ea71f0; gtmSessionStatus=true; usbls=1; x-oidcp-logintype=POST_PASSWORD_RESET_WITH_CHALLENGE; x-oidcp-audience=b098fa91cf6846626bee519cc94ff232f695fa644face06a696f36e614ec6e10; x-push-device-token=A7DrKxXEn2EB8P1E2WeLUZLWQg5Fe9Hi5vYgYbgUZ5BRKdJSZmeP4shyP55qfNU; ak_bmsc=AD0F3DEFAEB2B5C41119305845F31870~000000000000000000000000000000~YAAQqf1IF5jVdU2OAQAAdBMgUxc3iT3i2j61I7RnmmluiW+Ewo7a3M0+3JZzT8nrD7ra0WqNExX5v8UjxzvdJ+mkqIDhblTAs4ui6ucc5Zo9ispiNe3nObvCgKWdRNRvyOEuxQNLqnEr1S1l/raHLn0nr6AkiGEGq+fDULl8s/+iEDSk6utKvTilG0e3Q+bPEbteTMH79Hfc1wE7j4+TBDKES0qd16wuNqLgQpFomZjaaZd5fCtH1zNbfjGNnQ8jjZqc5nuucEbHWHhd3GRbuUEuSlF/WbeIqfBCT3+4XyWErWXORYxqKaw3kgWqvZvxWq5WLQtAOHG3CJBDFGNLNmikwkyflp4kz7mIF9MjLmeuq+v/uzvZpR0GhZUfKFfoA9FgkXcEMbFRow==; bm_sv=0DFA928D2CA5F697AF0904ECAA1DB190~YAAQwv1IFx+qoE6OAQAAdMUgUxcmdaHWqdPLmZcUQ9oaWM+klFI06qbbTU8ZlpFJIdC8CpRcQEIswyu9cj4IzaI3gyY5DR0/NNDv8qiBtRnenNLuGTvkwt9HRJaveU2Vch12eu1XPnGHsNIEW8SZDK++x6XuSWi+OYr8m57r9daS4QvY8cPtpRyncEIKjUCOW3EDNQK/KuMsi6jc9UCO4KSdOb7Vgbwf1thm9b/jE4XtHg7+1HOKDDP4fyO+DVA=~1",
-    "Upgrade-Insecure-Requests": "1",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "TE": "trailers",
-}
+# Configure session with retry logic
+session = requests.Session()
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET", "POST"],
+    respect_retry_after_header=True
+)
+adapter = HTTPAdapter(
+    max_retries=retry_strategy,
+    pool_connections=10,
+    pool_maxsize=10
+)
+session.mount("http://", adapter)
+session.mount("https://", adapter)
 
+# Rotating user agents to avoid detection
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Safari/605.1.15"
+]
+
+def get_random_user_agent() -> str:
+    """Return a random user agent from the list."""
+    import random
+    return random.choice(USER_AGENTS)
+
+def get_headers() -> Dict[str, str]:
+    """Return headers with a random user agent."""
+    return {
+        "User-Agent": get_random_user_agent(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0",
+        "Referer": "https://www.google.com/",
+    }
+
+def save_debug_info(filename: str, content: Any, content_type: str = "html") -> None:
+    """Save debug information to a file if directory exists."""
+    try:
+        if not os.path.exists(DEBUG_DIR):
+            return
+        path = os.path.join(DEBUG_DIR, filename)
+        if content_type == "json":
+            with open(f"{path}.json", "w", encoding="utf-8") as f:
+                if isinstance(content, (dict, list)):
+                    json.dump(content, f, indent=2, ensure_ascii=False)
+                else:
+                    f.write(str(content))
+        else:
+            with open(f"{path}.html", "w", encoding="utf-8") as f:
+                f.write(str(content))
+        logger.debug(f"Saved debug info to {path}")
+    except Exception as e:
+        logger.error(f"Failed to save debug info: {e}")
+
+def fetch_with_retry(url: str, max_retries: int = 3) -> Optional[requests.Response]:
+    """Fetch URL with retry logic and exponential backoff."""
+    last_exception = None
+    
+    for attempt in range(max_retries):
+        try:
+            headers = get_headers()
+            logger.info(f"Attempt {attempt + 1}: Fetching {url}")
+            
+            response = session.get(
+                url, 
+                headers=headers, 
+                timeout=15,
+                allow_redirects=True,
+                verify=True
+            )
+            
+            # Save response for debugging
+            save_debug_info(f"raw_response_{attempt}", response.text)
+            
+            # Check for privacy gate
+            if "privacy" in response.url or "privacy-gate" in response.text:
+                logger.info("Hit privacy gate, attempting bypass...")
+                import re
+                from urllib.parse import unquote
+                
+                # Try to find the callback URL in the script tag
+                match = re.search(r"decodeURIComponent\('(.*?)'\)", response.text)
+                if match:
+                    callback_encoded = match.group(1)
+                    callback_url = unquote(callback_encoded)
+                    logger.info(f"Following privacy callback: {callback_url}")
+                    
+                    # Small delay to mimic human interaction if needed, though session usually works
+                    time.sleep(1)
+                    
+                    response = session.get(
+                        callback_url,
+                        headers=headers,
+                        timeout=15,
+                        allow_redirects=True
+                    )
+                    logger.info(f"Privacy bypass response status: {response.status_code}")
+                    save_debug_info(f"bypass_response_{attempt}", response.text)
+                else:
+                    logger.warning("Could not find privacy callback URL")
+
+            response.raise_for_status()
+            
+            # Check if we got a valid HTML response
+            content_type = response.headers.get('content-type', '').lower()
+            if 'text/html' not in content_type:
+                logger.error(f"Unexpected content type: {content_type}")
+                continue
+                
+            return response
+            
+        except requests.exceptions.RequestException as e:
+            last_exception = e
+            wait_time = (2 ** attempt) + (random.random() * 2)
+            logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}. Retrying in {wait_time:.1f}s...")
+            time.sleep(wait_time)
+    
+    logger.error(f"Failed to fetch {url} after {max_retries} attempts: {str(last_exception)}")
+    return None
+
+def extract_headlines_from_api(soup: bs) -> List[Dict[str, Any]]:
+    """Try to extract headlines from potential JSON-LD or other script tags."""
+    headlines = []
+    
+    # Try to find JSON-LD data
+    for script in soup.find_all('script', type='application/ld+json'):
+        try:
+            data = json.loads(script.string)
+            if isinstance(data, list):
+                for item in data:
+                    if item.get('@type') == 'ItemList' and 'itemListElement' in item:
+                        for i, element in enumerate(item['itemListElement'], 1):
+                            if 'url' in element and 'name' in element:
+                                headlines.append({
+                                    'title': element['name'],
+                                    'url': element['url'],
+                                    'rank': i
+                                })
+        except (json.JSONDecodeError, AttributeError) as e:
+            logger.debug(f"Error parsing JSON-LD: {e}")
+            continue
+    
+    return headlines
 
 def scrape_headlines() -> List[Headline]:
-    res: List[Headline] = []
-
-    feed = requests.request("GET", URL, headers=headers, data=payload)
-
-    if not feed or not feed.text:
-        logger.error("Could not fetch feed")
+    """Scrape most read headlines from nu.nl."""
+    logger.info(f"Fetching most read articles from {URL}")
+    
+    # Save the URL being accessed
+    logger.debug(f"Accessing URL: {URL}")
+    
+    response = fetch_with_retry(URL)
+    if not response or not response.text:
+        logger.error("Failed to fetch or empty response from the server")
         return []
+    
+    # Save the full response for debugging
+    save_debug_info("full_response", response.text)
+    
+    try:
+        # Try different parsers if the default one fails
+        parsers = ['html.parser', 'lxml', 'html5lib']
+        soup = None
+        
+        for parser in parsers:
+            try:
+                soup = bs(response.text, parser)
+                # Test if we can find something with this parser
+                if soup.find('body'):
+                    logger.debug(f"Successfully parsed with {parser}")
+                    break
+            except Exception as e:
+                logger.debug(f"Parser {parser} failed: {e}")
+                continue
+        
+        if not soup:
+            logger.error("Failed to parse HTML with any parser")
+            return []
+            
+        # Save the parsed HTML for debugging
+        save_debug_info("parsed_html", soup.prettify())
+        
+        # Try to extract from potential API data first
+        api_headlines = extract_headlines_from_api(soup)
+        if api_headlines:
+            logger.info(f"Found {len(api_headlines)} headlines from API data")
+            return [
+                Headline(
+                    title=h['title'],
+                    summary="",
+                    url=h['url'],
+                    rank=h['rank']
+                ) for h in api_headlines
+            ]
+        
+        # If no API data, try CSS selectors
+        selectors = [
+            "a.link-block--thumb",
+            "a.link-block",
+            "ul.contentlist > li > a",
+            ".list--numbered > li > a",
+            "[data-testid='most-read-articles'] a",
+            "div[class*='list'] > a",
+            "a[class*='title']",
+            "h3 > a",
+            "a[href*='/artikel/']",
+            "div[class*='item'] > a",
+            "article > a"
+        ]
+        
+        nu_headlines = []
+        for selector in selectors:
+            try:
+                elements = soup.select(selector)
+                if elements:
+                    logger.info(f"Found {len(elements)} elements with selector: {selector}")
+                    # Filter only links that look like articles
+                    filtered = [
+                        el for el in elements 
+                        if el.get('href') and 
+                           any(p in el['href'] for p in ['/artikel/', '/nieuws/', '.html'])
+                    ]
+                    if filtered:
+                        nu_headlines = filtered
+                        logger.info(f"Using selector: {selector}")
+                        save_debug_info("selected_elements", [str(el) for el in nu_headlines], "json")
+                        break
+            except Exception as e:
+                logger.debug(f"Selector {selector} failed: {e}")
+                continue
 
-    soup = bs(feed.text)
-    # headlines = soup.find_all("ul", class_="list list--datetime")
-
-    nu_headlines = soup.select("ul.contentlist > li > a")
-
-    if not nu_headlines:
-        logger.error("No headlines found.")
+        if not nu_headlines:
+            logger.error("No headlines found with any selector")
+            # Try to find any links that might be articles
+            all_links = soup.find_all('a', href=True)
+            article_links = [
+                a for a in all_links 
+                if any(p in a['href'] for p in ['/artikel/', '/nieuws/', '.html'])
+                and (a.get_text(strip=True) or a.get('data-teaser-title'))
+            ]
+            
+            if article_links:
+                logger.info(f"Found {len(article_links)} potential article links")
+                nu_headlines = article_links
+            else:
+                logger.error("No article links found in the page")
+                # Save the page structure for debugging
+                save_debug_info("page_structure", soup.prettify())
+                return []
+        
+        # Process the found headlines
+        res = []
+        seen_urls = set()
+        
+        for i, headline in enumerate(nu_headlines[:15], 1):  # Limit to top 15
+            try:
+                # Get URL
+                url = headline.get('href', '').strip()
+                if not url:
+                    continue
+                    
+                # Make URL absolute if it's relative
+                if not url.startswith(('http://', 'https://')):
+                    url = f"https://www.nu.nl{url if not url.startswith('/') else ''}{url if url.startswith('/') else ''}"
+                
+                # Skip duplicates
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                
+                # Get title - try different methods
+                title = headline.get('data-teaser-title')
+                if not title:
+                    title_elem = headline.find(['span', 'h1', 'h2', 'h3', 'div', 'p'], class_='item-title')
+                    if title_elem:
+                        title = title_elem.get_text(strip=True)
+                
+                if not title:
+                    title = headline.get_text(strip=True)
+                
+                if not title:
+                    # Try to get title from title attribute or other attributes
+                    title = headline.get('title', headline.get('aria-label', '')).strip()
+                
+                if not title or not url:
+                    logger.debug(f"Skipping item with missing title or URL: {headline}")
+                    continue
+                
+                # Clean up title
+                title = ' '.join(title.split())
+                
+                res.append(Headline(
+                    title=title,
+                    summary="",
+                    url=url,
+                    rank=len(res) + 1,
+                ))
+                
+                logger.debug(f"Added headline {len(res)}: {title[:50]}...")
+                
+                # Stop if we have enough results
+                if len(res) >= 10:
+                    break
+                    
+            except Exception as e:
+                logger.warning(f"Error processing headline: {e}")
+                logger.debug(f"Problematic element: {headline}")
+                continue
+        
+        if not res:
+            logger.error("No valid headlines could be extracted")
+            # Save problematic elements for debugging
+            save_debug_info("problematic_elements", [str(h) for h in nu_headlines[:5]], "json")
+        else:
+            logger.info(f"Successfully scraped {len(res)} headlines")
+            
+        return res
+        
+    except Exception as e:
+        logger.error(f"Error parsing HTML: {str(e)}", exc_info=True)
         return []
-
-    ranking = 1  # "most read" ranking for each article
-
-    for headline in nu_headlines:
-        title = headline.find("span").text
-        url = headline["href"]
-
-        headline = Headline(
-            title=title.strip(),
-            summary="",
-            url=url,
-            rank=ranking,
-        )
-        ranking += 1
-        res.append(headline)
-
-    return res
